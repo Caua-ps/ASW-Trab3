@@ -12,6 +12,7 @@ import lob.app.games.ArkanoidKnockoffPanel;
 import lob.app.games.BallStormPanel;
 import lob.app.games.CannonPracticePanel;
 import lob.app.games.DribblingMasterPanel;
+import lob.app.games.MagnetPanel;
 import lob.app.games.MicroGolfPanel;
 import lob.gaming.Player;
 
@@ -50,6 +51,7 @@ public class MainView extends AppLayout {
                 new RouterLink("Micro Golf",       MicroGolfPanel.class),
                 new RouterLink("Arkanoid",         ArkanoidKnockoffPanel.class),
                 new RouterLink("Ball Storm",       BallStormPanel.class),
+                new RouterLink("Magnet",           MagnetPanel.class),
                 new RouterLink("Leaderboard",      LeaderboardPanel.class)
         );
         addToDrawer(menu);
