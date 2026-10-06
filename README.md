@@ -1,99 +1,210 @@
-# Project Base for Vaadin and Spring Boot
+# Lots of Balls 🎱
 
-This project can be used as a starting point to create your own Vaadin application with Spring Boot.
-It contains all the necessary configuration and some placeholder files to get you started.
+> Motor de física 2D escrito de raiz em Java e uma coleção de seis mini-jogos jogáveis no browser, com Spring Boot + Vaadin.
 
-The best way to create your own project based on this starter is [start.vaadin.com](https://start.vaadin.com/) - you can get only the necessary parts and choose the package naming you want to use.
+![Java](https://img.shields.io/badge/Java-21-orange?logo=openjdk&logoColor=white)
+![Spring Boot](https://img.shields.io/badge/Spring%20Boot-4.0-6DB33F?logo=springboot&logoColor=white)
+![Vaadin](https://img.shields.io/badge/Vaadin-25-00B4F0?logo=vaadin&logoColor=white)
+![Maven](https://img.shields.io/badge/build-Maven-C71A36?logo=apachemaven&logoColor=white)
 
-## Running the Application
-There are two ways to run the application :  using `mvn spring-boot:run` or by running the `Application` class directly from your IDE.
+Trabalho prático 3 da unidade curricular **ASW** — Licenciatura em Ciência de Computadores, Faculdade de Ciências da Universidade do Porto (2025/26).
 
-You can use any IDE of your preference,but we suggest Eclipse or Intellij IDEA.
-Below are the configuration details to start the project using a `spring-boot:run` command. Both Eclipse and Intellij IDEA are covered.
+<p align="center">
+  <img src="docs/img/ballstorm.gif" width="360" alt="Ball Storm">
+  <img src="docs/img/magnet.gif" width="360" alt="Magnet">
+</p>
 
-#### Eclipse
-- Right click on a project folder and select `Run As` --> `Maven build..` . After that a configuration window is opened.
-- In the window set the value of the **Goals** field to `spring-boot:run` 
-- You can optionally select `Skip tests` checkbox
-- All the other settings can be left to default
+---
 
-Once configurations are set clicking `Run` will start the application
+## Índice
 
-#### Intellij IDEA
-- On the right side of the window, select Maven --> Plugins--> `spring-boot` --> `spring-boot:run` goal
-- Optionally, you can disable tests by clicking on a `Skip Tests mode` blue button.
+- [Sobre o projeto](#sobre-o-projeto)
+- [Os jogos](#os-jogos)
+- [Arquitetura](#arquitetura)
+- [Padrões de desenho](#padrões-de-desenho)
+- [Como executar](#como-executar)
+- [Estrutura do repositório](#estrutura-do-repositório)
+- [Créditos](#créditos)
 
-Clicking on the green run button will start the application.
+## Sobre o projeto
 
-After the application has started, you can view your it at http://localhost:8080/ in your browser.
+O **Lots of Balls** é composto por três camadas:
 
+1. **Motor de física 2D** (`lob.physics`): integra o movimento sob forças configuráveis (gravidade, atrito, magnetismo), deteta e resolve colisões círculo/círculo, círculo/retângulo e retângulo/retângulo, e emite eventos de colisão e de saída do mundo.
+2. **Índice espacial** (`lob.quadtree`): uma *point quadtree* genérica que guarda as formas por posição para acelerar as consultas de colisão.
+3. **Camada de jogo** (`lob.gaming`): classe base com o ciclo de animação, registo persistente de jogadores, *leaderboard* e uma *factory* que descobre os jogos por reflexão.
 
-If you want to run the application locally in the production mode, use `package` and `java -jar target/spring-skeleton-1.0-SNAPSHOT.jar` commands instead.
-### Running Integration Tests
+Por cima destas camadas existem duas interfaces gráficas:
 
-Integration tests are implemented using [Vaadin TestBench](https://vaadin.com/testbench). The tests take a few minutes to run and are therefore included in a separate Maven profile. We recommend running tests with a production build to minimize the chance of development time toolchains affecting test stability. To run the tests using Google Chrome, execute
+- **Aplicação web** (`lob.app`): Spring Boot + Vaadin, com *layout* de navbar e *drawer*, gestão de jogadores, *leaderboard* por jogo e animação enviada do servidor para um `<canvas>` HTML5 via *server push*.
+- **Lançadores desktop** (`lob.guis`): janelas Swing para correr os jogos originais sem servidor.
 
-`mvn verify -Pit`
+## Os jogos
 
-and make sure you have a valid TestBench license installed.
+| | Jogo | Força | Como se joga | Pontuação |
+|:-:|---|---|---|---|
+| <img src="docs/img/cannon.gif" width="200"> | **Cannon Practice** | Gravidade | Clica para disparar o canhão na direção do clique e acerta no alvo atrás do muro. | Acertos acumulados |
+| <img src="docs/img/dribbling.png" width="200"> | **Dribbling Master** | Gravidade + amortecimento | Clica perto da bola de basquete para lhe dar um impulso e fá-la quicar até ao alvo à direita. | 100 ao acertar |
+| <img src="docs/img/golf.png" width="200"> | **Micro Golf** | Atrito | Clica para dar uma tacada na direção do clique. Contorna o obstáculo em L até ao buraco. | `100 − 10 × (tacadas − 1)` |
+| <img src="docs/img/arkanoid.gif" width="200"> | **Arkanoid Knockoff** | Nenhuma (inércia) | Move o rato para controlar a raquete e clica para lançar a bola. Parte todos os tijolos. | Tijolos partidos |
+| <img src="docs/img/ballstorm.gif" width="200"> | **Ball Storm** ⭐ | Gravidade | Cada clique lança uma rajada de bolas em direções aleatórias. É um teste de esforço ao motor com centenas de bolas a colidir. | Bolas lançadas |
+| <img src="docs/img/magnet.gif" width="200"> | **Magnet** ⭐ | Magnetismo | O íman segue o cursor e as bolas seguem o íman. Leva o enxame até ao alvo dourado. | Bolas entregues |
 
-Profile `it` adds the following parameters to run integration tests:
-```sh
--Dwebdriver.chrome.driver=path_to_driver
--Dcom.vaadin.testbench.Parameters.runLocally=chrome
+⭐ Jogos extra criados como valorização do trabalho. Usam uma `ForceStrategy` nova (`MagnetStrategy`) e são descobertos automaticamente pela `ReflectGameFactory`, sem alterar código de descoberta.
+
+> As animações acima foram geradas diretamente a partir do motor de física com o renderizador Swing do projeto.
+
+## Arquitetura
+
+```mermaid
+flowchart TB
+    subgraph UI["Interface"]
+        direction LR
+        WEB["lob.app<br/>Vaadin + Spring Boot<br/>(MainView, *Panel, Canvas)"]
+        SWING["lob.guis<br/>Swing<br/>(*GUI, WorldViewer)"]
+    end
+
+    subgraph GAMING["lob.gaming"]
+        GA["GameAnimation<br/>(ciclo de animação)"]
+        GAMES["games.*<br/>CannonPractice, MicroGolf, …"]
+        RGF["ReflectGameFactory"]
+        PL["Players / LeaderboardManager<br/>(persistência em disco)"]
+    end
+
+    subgraph PHYS["lob.physics"]
+        PW["PhysicsWorld"]
+        FS["forces.*<br/>Gravity / Friction / Magnet / NoForce"]
+        CM["engine.SimpleCollisionManager"]
+        EV["events.*<br/>CollisionEvent, EscapeEvent"]
+        ACT["actions.*<br/>Add / Remove / Reset"]
+    end
+
+    QT["lob.quadtree<br/>PointQuadtree"]
+
+    WEB --> GA
+    SWING --> GA
+    WEB --> RGF
+    RGF -.descobre.-> GAMES
+    GAMES -->|extends| GA
+    GA --> PW
+    GA --> PL
+    PW --> FS
+    PW --> CM
+    PW --> EV
+    PW --> ACT
+    PW --> QT
 ```
 
-If you would like to run a separate test make sure you have added these parameters to VM Options of JUnit run configuration
+**Ciclo de cada frame:**
 
-### Live Reload (optional)
+1. `GameAnimation` chama `step()` no jogo concreto (à taxa de FPS configurada, 60 na versão web).
+2. O `PhysicsWorld` pede a aceleração à `ForceStrategy` e integra a posição e a velocidade de cada forma.
+3. O `CollisionManager` deteta as sobreposições (calculando o *manifold* com a normal e a penetração), repõe as posições, rebate as velocidades com o coeficiente de restituição e notifica os observadores.
+4. Os jogos reagem aos eventos (por exemplo, remover um tijolo) através de comandos diferidos, aplicados no fim do ciclo.
+5. O *frame* (a lista de formas) é enviado ao `FrameShower`, que o desenha no `<canvas>` (web) ou no `Canvas` AWT (Swing).
 
-With live reload, you can see the results of your code changes immediately. 
-When you edit your Java code and recompile it, the application changes will be automatically reloaded and the browser is refreshed.
-This is done by leveraging [Spring Boot Developer Tools](https://docs.spring.io/spring-boot/docs/2.1.5.RELEASE/reference/html/using-boot-devtools.html). 
-To be able to see the changes in the browser tab, the page still needs to be reloaded. 
-That can also  be automated via a LiveReload browser extension. 
-One such extension for Google Chrome is [LiveReload](https://chrome.google.com/webstore/detail/livereload/jnihajbhpnppcggbcgedagnkighmdlei). 
-In Firefox, [LiveReload - Web extension](https://addons.mozilla.org/en-US/firefox/addon/livereload-web-extension/) can be used.
-You can find such similar extensions for other major browsers too.
-These extensions add an icon to your browser next to the address bar.
-To enable the extension, you should click that icon after you opened your application. 
+## Padrões de desenho
 
-You can find more information at [Live Reload in Spring Boot Applications](https://vaadin.com/docs/flow/workflow/tutorial-spring-boot-live-reload.html) document.
+| Padrão | Onde | Para quê |
+|---|---|---|
+| **Strategy** | `ForceStrategy` → `GravityStrategy`, `FrictionStrategy`, `MagnetStrategy`, `NoForceStrategy`; `CollisionManager` | Cada jogo troca a física sem mexer no motor. `NoForceStrategy` funciona como *null object*. |
+| **Observer** | `PhysicsSubject` / `PhysicsObserver` / `PhysicsEvent` | Os jogos subscrevem eventos de colisão e de saída do mundo com *lambdas*. |
+| **Command** | `ActionOnShapes`, `PendingActions`, `Add/Remove/ResetAction` | Alterações ao mundo durante a iteração ficam em fila, o que evita `ConcurrentModificationException`. |
+| **Composite** | `Trie` → `LeafTrie` / `NodeTrie` | Nós da *quadtree*: folhas guardam pontos e nós internos delegam em 4 quadrantes. |
+| **Façade** | `PointQuadtree` | Expõe uma API simples (inserir, procurar, remover, consulta por região, iterar) por cima da estrutura recursiva. |
+| **Template Method** | `GameAnimation` | Define o ciclo de animação. Os jogos só implementam `resetGame()` e `step()`. |
+| **Factory Method** | `AppearanceFactory` | O motor só conhece nomes lógicos (`"ball"`, `"wall"`) e cada interface decide como desenhá-los. |
+| **Factory + Reflection** | `ReflectGameFactory` | Descobre e instancia todas as subclasses de `GameAnimation` em `lob.gaming.games`. |
+| **Singleton** | `Players`, `LeaderboardManager` | Registos únicos com persistência por serialização Java. |
 
-## Structure
+Outros detalhes de implementação:
 
-Vaadin web applications are full-stack and include both client-side and server-side code in the same project.
+- `Shape` é uma interface **`sealed`** restrita a `Circle` e `Rectangle`.
+- `Vector2D`, `Circle` e os eventos são **`record`s** imutáveis.
+- O eixo *y* cresce para baixo (convenção de ecrã).
 
-| Directory                                  | Description |
-|:-------------------------------------------| :--- |
-| `src/main/frontend/`                       | Client-side source directory |
-| &nbsp;&nbsp;&nbsp;&nbsp;`index.html`       | HTML template |
-| &nbsp;&nbsp;&nbsp;&nbsp;`index.ts`         | Frontend entrypoint |
-| &nbsp;&nbsp;&nbsp;&nbsp;`main-layout.ts`   | Main layout Web Component (optional) |
-| &nbsp;&nbsp;&nbsp;&nbsp;`views/`           | UI views Web Components (TypeScript / HTML) |
-| &nbsp;&nbsp;&nbsp;&nbsp;`styles/`          | Styles directory (CSS) |
-| `src/main/java/<groupId>/`                 | Server-side source directory |
-| &nbsp;&nbsp;&nbsp;&nbsp;`Application.java` | Server entrypoint |
-| &nbsp;&nbsp;&nbsp;&nbsp;`AppShell.java`    | application-shell configuration |
+## Como executar
 
-## Code Formatting
+### Requisitos
 
-The project includes the Spotless code formatter.
+- **JDK 21**
+- Maven (ou o *wrapper* `mvnw` incluído)
+- Acesso à internet no primeiro *build*, para o Maven e o Vaadin descarregarem as dependências e o Node.js
 
-To use it in IntelliJ, install the [https://plugins.jetbrains.com/plugin/22455-spotless-applier](IntelliJ plugin)
-To use it in VS Code, install the [https://marketplace.visualstudio.com/items?itemName=richardwillis.vscode-spotless-gradle ](VS Code extension)
-To use it from the command line, run `mvn spotless:apply`
+### Aplicação web (Vaadin)
 
-## Useful links
+```bash
+./mvnw spring-boot:run          # Linux / macOS
+mvnw.cmd spring-boot:run        # Windows
+```
 
-- Read the documentation at [vaadin.com/docs](https://vaadin.com/docs).
-- Follow the tutorials at [vaadin.com/tutorials](https://vaadin.com/tutorials).
-- Watch training videos and get certified at [vaadin.com/learn/training](https://vaadin.com/learn/training).
-- Create new projects at [start.vaadin.com](https://start.vaadin.com/).
-- Search UI components and their usage examples at [vaadin.com/components](https://vaadin.com/components).
-- View use case applications that demonstrate Vaadin capabilities at [vaadin.com/examples-and-demos](https://vaadin.com/examples-and-demos).
-- Discover Vaadin's set of CSS utility classes that enable building any UI without custom CSS in the [docs](https://vaadin.com/docs/latest/ds/foundation/utility-classes). 
-- Find a collection of solutions to common use cases in [Vaadin Cookbook](https://cookbook.vaadin.com/).
-- Find Add-ons at [vaadin.com/directory](https://vaadin.com/directory).
-- Ask questions on [Stack Overflow](https://stackoverflow.com/questions/tagged/vaadin) or join our [Discord channel](https://discord.gg/MYFq5RTbBn).
-- Report issues, create pull requests in [GitHub](https://github.com/vaadin/platform).
+A aplicação abre em **http://localhost:8080**. Para começar:
+
+1. Clica em **Jogador** para registar ou entrar com um jogador.
+2. Escolhe um jogo no menu lateral.
+3. Consulta as melhores pontuações em **Leaderboard**.
+
+Os jogadores e as pontuações ficam guardados em `players.dat` e `leaderboard.dat` na diretoria de execução.
+
+Para gerar um JAR de produção:
+
+```bash
+./mvnw clean package
+java -jar target/spring-skeleton-1.0-SNAPSHOT.jar
+```
+
+### Versões desktop (Swing)
+
+Os quatro jogos originais têm lançadores Swing que não precisam do servidor. Os pacotes `lob.physics`, `lob.quadtree`, `lob.gaming` e `lob.guis` não dependem de bibliotecas externas:
+
+```bash
+mkdir -p out
+javac -d out $(find src/main/java/lob -name '*.java' -not -path '*/app/*')
+java -cp out lob.guis.CannonPracticeGUI      # ou MicroGolfGUI, DribblingMasterGUI, ArkanoidKnockoffGUI
+```
+
+Também podes correr qualquer classe `*GUI` diretamente a partir do IntelliJ ou do Eclipse.
+
+### Adicionar um jogo novo
+
+1. Cria uma subclasse de `GameAnimation` em `lob.gaming.games`, com construtor sem argumentos e um campo `public static final String GAME_NAME`.
+2. Implementa `resetGame()` (montar o mundo e escolher a `ForceStrategy`) e `step()` (regras do jogo).
+3. Cria um `*Panel` em `lob.app.games` que estenda `GenericGamePanel`, com `@Route(layout = MainView.class)` e um método `getAppearanceColors()`.
+
+O jogo aparece automaticamente na página inicial, através da `ReflectGameFactory`.
+
+## Estrutura do repositório
+
+```
+src/main/java/lob/
+├── app/                 # Aplicação web (Vaadin + Spring Boot)
+│   ├── Application.java     # ponto de entrada (@Push, persistência, FPS)
+│   ├── MainView.java        # AppLayout: navbar + drawer
+│   ├── WelcomePanel.java    # página inicial (lista de jogos por reflexão)
+│   ├── LeaderboardPanel.java
+│   ├── PlayerDialog.java    # registo / login de jogadores
+│   ├── Canvas.java          # binding para <canvas> HTML5
+│   ├── WorldViewer.java     # desenha os frames no canvas
+│   ├── GenericGamePanel.java
+│   └── games/               # um *Panel por jogo
+├── gaming/              # Lógica de jogo
+│   ├── GameAnimation.java   # Template Method: ciclo de animação
+│   ├── ReflectGameFactory.java
+│   ├── Players.java / Player.java
+│   ├── LeaderboardManager.java
+│   └── games/               # os 6 jogos
+├── physics/             # Motor de física 2D
+│   ├── Vector2D.java
+│   ├── engine/              # PhysicsWorld, CollisionManager, manifold
+│   ├── forces/              # Gravity, Friction, Magnet, NoForce
+│   ├── shapes/              # Circle, Rectangle (sealed Shape)
+│   ├── events/              # Observer: CollisionEvent, EscapeEvent
+│   └── actions/             # Command: Add/Remove/Reset
+├── quadtree/            # PointQuadtree (Composite)
+└── guis/                # Lançadores Swing
+```
+
+## Créditos
+
+- **Cauã Pinheiro Souza**, com o grupo 12 de ASW 2025/26.
+- O esqueleto Spring Boot/Vaadin e as classes de suporte `Canvas`, `WorldViewer` e `GenericGamePanel` (na versão original) foram fornecidos pela equipa docente (Prof. José Paulo Leal).
